@@ -1,0 +1,7 @@
+*.apk
+*.zip
+build/
+*.keystore
+.DS_Store
+*.log
+scratch/

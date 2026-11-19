@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/btn_standalone_color_grading"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="?attr/selectableItemBackgroundBorderless"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/ic_color_grade"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_color_grade_wheel"
+        android:tint="#FF2B44" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:text="Color Grading"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:fontFamily="sans-serif-medium" />
+</LinearLayout>
