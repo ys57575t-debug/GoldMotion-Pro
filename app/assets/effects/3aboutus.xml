@@ -1,0 +1,16 @@
+<?xml
+version='1.0'
+encoding='UTF-8' ?>
+<effect id="com.alightcreative.effect.skexnxx"
+name="About Us"
+desc="Modded by Fundaz"
+category="other"
+thumb="thumb/aboutus_goldmotion.webp"
+tags="other">
+<params>
+<section text="MODDED BY Fundaz" />
+<section text="MODDED BY Fundaz" />
+<section text="TELEGRAM: @okfundazj" />
+<tip text="THANKS FOR DOWNLOAD FUNDAZ EDITOR APK" />
+</params>
+</effect>
