@@ -3,14 +3,12 @@ import os
 import sys
 import struct
 import zlib
-import time
 
 STORED_EXTENSIONS = {
     '.arsc',
     '.png', '.jpg', '.jpeg', '.gif', '.webp',
     '.mp4', '.m4a', '.mp3', '.ogg', '.wav', '.webm',
-    '.tflite',
-    '.so'
+    '.tflite'
 }
 
 def should_store(rel_path):
@@ -29,12 +27,10 @@ def build_aligned_apk(app_dir, output_apk):
             rel_path = os.path.relpath(full_path, app_dir).replace('\\', '/')
             if rel_path.startswith("src/") or rel_path.startswith(".git"):
                 continue
-            # Also skip any existing signature files in META-INF (apksigner will re-sign)
             if rel_path.startswith("META-INF/") and (rel_path.endswith(".SF") or rel_path.endswith(".RSA") or rel_path.endswith(".DSA") or rel_path.endswith(".MF")):
                 continue
             files_to_pack.append((full_path, rel_path))
 
-    # To ensure Android loads classes in optimal order, sort so AndroidManifest.xml and classes*.dex come first
     def sort_key(item):
         p = item[1]
         if p == "AndroidManifest.xml":
@@ -43,6 +39,8 @@ def build_aligned_apk(app_dir, output_apk):
             num = p.replace("classes", "").replace(".dex", "")
             n = int(num) if num else 1
             return (1, n)
+        if p.startswith("gm3d") and p.endswith(".dex"):
+            return (1, 999)
         if p == "resources.arsc":
             return (2, p)
         return (3, p)
@@ -50,7 +48,6 @@ def build_aligned_apk(app_dir, output_apk):
     files_to_pack.sort(key=sort_key)
     print(f"Total files to pack: {len(files_to_pack)}")
 
-    # Use fixed timestamp for reproducibility (2026-01-01 00:00:00)
     dos_time = 0x5c00
     dos_date = 0x5c01
 
@@ -72,20 +69,15 @@ def build_aligned_apk(app_dir, output_apk):
                 method = 0
                 comp_data = data
                 comp_size = uncomp_size
-                align = 4096 if rel_p.endswith('.so') else 4
+                align = 4
             else:
                 method = 8
-                # compress with deflate (wbits=-15 for raw deflate)
                 compressor = zlib.compressobj(6, zlib.DEFLATED, -15)
                 comp_data = compressor.compress(data) + compressor.flush()
                 comp_size = len(comp_data)
                 align = 1
 
-            # Current write position
             header_offset = out.tell()
-            
-            # Calculate padding needed for data alignment
-            # Local header = 30 + fname_len + extra_len
             min_header_size = 30 + fname_len
             data_offset = header_offset + min_header_size
             if align > 1:
@@ -96,8 +88,6 @@ def build_aligned_apk(app_dir, output_apk):
             extra = b'\x00' * padding
             extra_len = len(extra)
             
-            # Write local header
-            # Signature: PK\x03\x04
             flags = 0
             version_needed = 20
             local_hdr = struct.pack(
@@ -119,15 +109,12 @@ def build_aligned_apk(app_dir, output_apk):
             if extra_len > 0:
                 out.write(extra)
             
-            # Verify data alignment
             actual_data_offset = out.tell()
             if align > 1:
-                assert actual_data_offset % align == 0, f"Alignment failed for {rel_p}: offset {actual_data_offset} not divisible by {align}"
+                assert actual_data_offset % align == 0, f"Alignment failed for {rel_p}"
             
-            # Write data
             out.write(comp_data)
             
-            # Record central directory entry info
             cd_entries.append((
                 version_needed, flags, method, dos_time, dos_date,
                 crc, comp_size, uncomp_size, fname_bytes, header_offset
@@ -136,7 +123,6 @@ def build_aligned_apk(app_dir, output_apk):
             if (idx + 1) % 1000 == 0:
                 print(f"  Processed {idx + 1} / {len(files_to_pack)} files...")
 
-        # Central directory
         cd_start_offset = out.tell()
         for entry in cd_entries:
             v_needed, flags, method, dtime, ddate, crc, c_sz, u_sz, f_bytes, h_off = entry
@@ -144,7 +130,7 @@ def build_aligned_apk(app_dir, output_apk):
             cd_hdr = struct.pack(
                 '<4sHHHHHHIIIHHHHHII',
                 b'PK\x01\x02',
-                0x0314, # version made by (UNIX, zip 2.0)
+                0x0314,
                 v_needed,
                 flags,
                 method,
@@ -154,11 +140,11 @@ def build_aligned_apk(app_dir, output_apk):
                 c_sz,
                 u_sz,
                 fn_len,
-                0, # extra_len in CD
-                0, # comment_len
-                0, # disk number start
-                0, # internal file attrs
-                0x81a40000 if not f_bytes.endswith(b'/') else 0x41ed0000, # external file attrs
+                0,
+                0,
+                0,
+                0,
+                0x81a40000 if not f_bytes.endswith(b'/') else 0x41ed0000,
                 h_off
             )
             out.write(cd_hdr)
@@ -167,17 +153,16 @@ def build_aligned_apk(app_dir, output_apk):
         cd_end_offset = out.tell()
         cd_total_size = cd_end_offset - cd_start_offset
         
-        # End of Central Directory record
         eocd = struct.pack(
             '<4sHHHHIIH',
             b'PK\x05\x06',
-            0, # disk num
-            0, # disk num with start
+            0,
+            0,
             len(cd_entries),
             len(cd_entries),
             cd_total_size,
             cd_start_offset,
-            0 # comment len
+            0
         )
         out.write(eocd)
 
